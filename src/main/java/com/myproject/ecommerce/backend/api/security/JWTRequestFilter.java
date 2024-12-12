@@ -26,7 +26,7 @@ public class JWTRequestFilter extends OncePerRequestFilter {
 
     public JWTRequestFilter(JWTService jwtService, LocalUserDAO localUserDAO) {
         this.jwtService = jwtService;
-        this.localUserDAO = localUserDAO;
+
     }
 
 
