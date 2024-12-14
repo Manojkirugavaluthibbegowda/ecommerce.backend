@@ -3,9 +3,9 @@
 -- You first need to register two users into the system before running this scirpt.
 
 -- Replace the id here with the first user id you want to have ownership of the orders.
-DECLARE @userId1 AS INT = 8;
+DECLARE @userId1 AS INT = 7;
 -- Replace the id here with the second user id you want to have ownership of the orders.
-DECLARE @userId2 AS INT = 9;
+DECLARE @userId2 AS INT = 10007;
 
 DELETE FROM web_order_quantities;
 DELETE FROM web_order;
