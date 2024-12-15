@@ -4,13 +4,16 @@ import com.myproject.ecommerce.backend.api.Loginbody;
 import com.myproject.ecommerce.backend.api.model.RegistrationBody;
 import com.myproject.ecommerce.backend.exception.EmailFailureException;
 import com.myproject.ecommerce.backend.exception.UserAlreadyExistsException;
+import com.myproject.ecommerce.backend.exception.UserNotverifiedException;
 import com.myproject.ecommerce.backend.model.LocalUser;
 import com.myproject.ecommerce.backend.model.VerificationToken;
 import com.myproject.ecommerce.backend.model.dao.LocalUserDAO;
 import com.myproject.ecommerce.backend.model.dao.VerificationTokenDAO;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Optional;
 
 
@@ -64,15 +67,45 @@ public class UserService {
 
     }
 
-    public String loginUser(Loginbody loginBody) {
+    public String loginUser(Loginbody loginBody) throws UserNotverifiedException, EmailFailureException {
         Optional<LocalUser> opUser = localUserDAO.findByUsernameIgnoreCase(loginBody.getUsername());
         if (opUser.isPresent()) {
             LocalUser user = opUser.get();
             if(encryptionService.verifyPassword(loginBody.getPassword(), user.getPassword())) {
-                return jwtService.generateJWT(user);
+                if (user.isEmailVerified()) {
+                    return jwtService.generateJWT(user);
+                } else {
+                    List<VerificationToken> verificationTokens = user.getVerificationTokens();
+                    boolean resend = verificationTokens.size() == 0 ||
+                            verificationTokens.get(0).getCreatedTimestamp().before(new Timestamp(System.currentTimeMillis() - (60 * 60 * 1000)));
+                    if (resend) {
+                        VerificationToken verificationToken = createVerificationToken(user);
+                        verificationTokenDAO.save(verificationToken);
+                        emailService.sendVerificationEmail(verificationToken);
+                    }
+                    throw new UserNotverifiedException(resend);
+                }
             }
         }
         return null;
     }
+
+
+    @Transactional
+    public boolean verifyUser(String token) {
+        Optional<VerificationToken> opToken = verificationTokenDAO.findByToken(token);
+        if(opToken.isPresent()) {
+            VerificationToken verificationToken = opToken.get();
+            LocalUser user = verificationToken.getUser();
+            if(!user.isEmailVerified()) {
+                user.setEmailVerified(true);
+                localUserDAO.save(user);
+                verificationTokenDAO.deleteByUser(user);
+                return true;
+            }
+        }
+        return false;
+    }
+
 
 }
